@@ -1,0 +1,62 @@
+name: Release
+
+# Publishing is tag-driven: push a version tag and this workflow validates the
+# package, builds the tarball, and attaches it to the GitHub Release. Use the
+# automatically provided GITHUB_TOKEN, so the repository needs no secrets.
+#
+#   git tag v1.0.1 && git push origin v1.0.1
+#
+# Re-running for a tag that already has a release replaces the attached asset
+# instead of failing, so a corrected build can be republished.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify package invariants
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > "$RUNNER_TEMP/pack.json"
+          node scripts/verify.mjs "$RUNNER_TEMP/pack.json"
+
+      - name: Build the tarball
+        run: npm pack --pack-destination dist
+
+      - name: Attach the tarball to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag exists; replacing its asset."
+            gh release upload "$tag" dist/*.tgz --clobber
+          else
+            echo "Creating release $tag."
+            gh release create "$tag" dist/*.tgz --title "$tag" --generate-notes
+          fi
+
+      - name: Record the checksum in the run summary
+        run: |
+          set -euo pipefail
+          tarball=$(basename dist/*.tgz)
+          digest=$(sha256sum dist/*.tgz | cut -d' ' -f1)
+          {
+            echo "### Released \`$GITHUB_REF_NAME\`"
+            echo
+            echo "| File | SHA-256 |"
+            echo "|---|---|"
+            echo "| \`$tarball\` | \`$digest\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

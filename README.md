@@ -88,7 +88,28 @@ cordis.patch.yml      Bundle patch that inserts the plugin row
 locale/*.json         Plugin manager title and description (8 languages)
 icon.svg              Plugin artwork
 vendor/               Vendored @deepseek-ai/schemastery and cosmokit builds (MIT)
+scripts/verify.mjs    Package invariant checks, run by CI and locally
+assets/               Screenshots used by this README (not packed)
 ```
+
+## Releasing
+
+Publishing is tag-driven and needs no configuration: no secrets, no local build step.
+
+```sh
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+The `Release` workflow then validates the package, builds the tarball, and attaches it to the GitHub Release, using the `GITHUB_TOKEN` GitHub provides automatically. Pushing a tag that already has a release replaces the attached asset instead of failing.
+
+Before tagging, the same checks run on every push and pull request, and locally:
+
+```sh
+npm pack --dry-run --json > /tmp/pack.json && node scripts/verify.mjs /tmp/pack.json
+```
+
+`scripts/verify.mjs` guards the invariants that would otherwise break silently: the browser module id must equal the package name, the settings namespace must equal the patch row id, every `Config` field must be `.volatile()`, the vendored schema library must resolve from the packed files, and every locale must carry a title and description.
 
 ## Notes for theme authors
 
@@ -130,6 +151,23 @@ plugin_manager { action: "install_bundle", target: "<本目录绝对路径>" }
 ### 更新
 
 `install_bundle` 不允许重复安装同一个包，先移除再装，然后重启 `dsh` 让浏览器加载新的模块。
+
+### 发版
+
+推标签即可，不需要任何额外配置（不用配 secret，也不用本地打包）：
+
+```sh
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+`Release` 工作流会自动校验、打包并把 tgz 挂到对应 Release 上，用的是 GitHub 自带的 `GITHUB_TOKEN`。同一个标签重跑会替换附件而不是报错。
+
+推之前同样的检查也会在每次 push 和 PR 上跑，本地也可以跑：
+
+```sh
+npm pack --dry-run --json > /tmp/pack.json && node scripts/verify.mjs /tmp/pack.json
+```
 
 ### 配置
 
