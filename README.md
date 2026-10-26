@@ -1,5 +1,7 @@
 # Linen theme
 
+[![CI](https://github.com/Chuyuxuan0v0/deepseek-harness-theme-linen/actions/workflows/ci.yml/badge.svg)](https://github.com/Chuyuxuan0v0/deepseek-harness-theme-linen/actions/workflows/ci.yml)
+
 A warm neutral theme for the DeepSeek Harness Web GUI. It warms the surfaces, rounds the corners one step further, and prefers sharper default fonts — in both light and dark appearance.
 
 中文说明见下方 [中文](#中文).
