@@ -4,7 +4,9 @@
 
 A warm neutral theme for the DeepSeek Harness Web GUI. It warms the surfaces, rounds the corners one step further, and prefers sharper default fonts — in both light and dark appearance.
 
-中文说明见下方 [中文](#中文).
+DSH Web 界面的暖中性主题：表面更温暖、圆角再圆一档、默认字体更锐利，亮色与暗色外观同时生效。
+
+完整中文说明见下方 [中文](#中文).
 
 ## Screenshots
 
