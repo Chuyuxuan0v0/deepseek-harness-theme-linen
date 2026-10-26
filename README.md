@@ -4,6 +4,16 @@ A warm neutral theme for the DeepSeek Harness Web GUI. It warms the surfaces, ro
 
 中文说明见下方 [中文](#中文).
 
+## Screenshots
+
+Light appearance with the theme applied — the new-session screen, showing the warm surfaces and the softer corner scale:
+
+![The Linen theme applied to the new-session screen in light appearance](assets/light-appearance.png)
+
+The theme's settings page, under **Settings → Linen theme**:
+
+![The Linen theme settings page](assets/settings-page.png)
+
 ## What it changes
 
 | Area | Effect |
