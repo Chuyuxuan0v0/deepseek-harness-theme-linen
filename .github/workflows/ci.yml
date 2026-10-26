@@ -28,7 +28,10 @@ jobs:
           node scripts/verify.mjs "$RUNNER_TEMP/pack.json"
 
       - name: Build the tarball
-        run: npm pack --pack-destination dist
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          npm pack --pack-destination dist
 
       - name: Show the tarball contents
         run: |
