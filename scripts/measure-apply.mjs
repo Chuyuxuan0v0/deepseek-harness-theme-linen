@@ -104,7 +104,7 @@ globalThis.window = {
 }
 const react = {
   createElement: () => null,
-  useState: () => [undefined, () => {}],
+  useState: () => [null, () => {}],
 }
 await import(pathToFileURL(file).href)
 const plugin = definition.factory(specifier => {
@@ -116,26 +116,45 @@ plugin.apply(context)
 const initialCalls = calls.length
 const initialTokens = calls.reduce((total, call) => total + Object.keys(call.tokens).length, 0)
 
+/** Radius tokens from the last rebuild, as the presenter would receive them. */
+const radiusOf = (call) => ['xs', 'sm', 'md', 'lg', 'xl', 'panel']
+  .map(tier => call.tokens[`--dsw-radius-${tier}`]?.light)
+  .join(' ')
+
+// ------------------------------------------------------ legacy document
+// A document written before the sliders existed stores `radius: 'large'` and
+// no `radiusScale`. It must keep rendering the previous scale exactly.
+const legacy = { enabled: true, palette: 'warm', radius: 'large', textFont: '', codeFont: '', strongWeight: 600 }
+form.emit({ status: 'ready', value: legacy, writable: true, revision: 2 })
+const legacyCall = calls[calls.length - 1]
+const legacyRadius = radiusOf(legacyCall)
+console.log('legacy radius "large" (no radiusScale stored) ->', legacyRadius)
+console.log('  matches the previous large preset (8 14 18 24 28 36):',
+  legacyRadius === '8px 14px 18px 24px 28px 36px')
+
 // ------------------------------------------------------- replay one click
 const before = calls.length
-const save = registered[0].inject().save
+const face = registered[0].inject()
+const save = face.save
 
 // 1. The click applies the chosen value before the Host is asked.
-const pending = save('radius', 'large')
+const pending = save('radiusScale', 50)
 const afterClick = calls.length
 
 // 2. The write answer folds in, then the Host's document-updated read answers
 //    with the same value: both are no-ops now.
-const changed = { ...section, radius: 'large' }
+const changed = { ...legacy, radiusScale: 50 }
 await pending
 form.emit({ status: 'ready', value: changed, writable: true, revision: 3 })
 const afterEcho = calls.length
+const halfRadius = radiusOf(calls[calls.length - 1])
+console.log('slider at 50% ->', halfRadius)
 
 // 3. A second click that genuinely changes the value again.
-const twice = save('radius', 'standard')
+const twice = save('radiusScale', 100)
 const afterSecond = calls.length
 await twice
-form.emit({ status: 'ready', value: section, writable: true, revision: 4 })
+form.emit({ status: 'ready', value: legacy, writable: true, revision: 4 })
 const afterSecondEcho = calls.length
 
 const line = (label, count, tokens) => {
@@ -144,14 +163,15 @@ const line = (label, count, tokens) => {
 }
 
 const perRebuild = Object.keys(calls[calls.length - 1]?.tokens ?? {}).length
+console.log('')
 console.log('tokens per full rebuild:', perRebuild)
 console.log('inline style writes the presenter makes per rebuild:', 2 * perRebuild)
 console.log('')
 console.log('apply() sequence:')
 line('startup (paint defaults, then the saved value)', initialCalls, initialTokens)
-line('click: radius standard -> large', afterClick - before)
+line('click: slider 0% -> 50%', afterClick - before)
 line('write echo + document-updated (unchanged)', afterEcho - afterClick)
-line('click: radius large -> standard', afterSecond - afterEcho)
+line('click: slider 50% -> 100%', afterSecond - afterEcho)
 line('write echo + document-updated (unchanged)', afterSecondEcho - afterSecond)
 
 const wasteful = (afterEcho - afterClick) + (afterSecondEcho - afterSecond)
@@ -160,3 +180,21 @@ console.log('')
 console.log('rebuilds that carried a change:    ', useful)
 console.log('rebuilds that carried no change:   ', wasteful)
 console.log('rebuilds per click (wasted + real):', (useful + wasteful) / 2)
+
+// --------------------------------------------------- dragging a slider
+// A drag reports many positions. Previews are coalesced, and only the release
+// writes to the Host, so a gesture costs a bounded number of rebuilds.
+const beforeDrag = calls.length
+for (let position = 0; position <= 95; position += 5) face.preview('radiusScale', position)
+const immediate = calls.length - beforeDrag
+await new Promise(resolve => setTimeout(resolve, 150))
+const afterCoalesce = calls.length - beforeDrag
+const beforeRelease = calls.length
+await save('radiusScale', 95)
+const onRelease = calls.length - beforeRelease
+
+console.log('')
+console.log(`drag of 20 positions (0..95 in steps of 5):`)
+console.log('  rebuilds applied immediately          ', immediate)
+console.log('  rebuilds after coalescing settles     ', afterCoalesce)
+console.log('  extra rebuilds when the drag is released', onRelease)

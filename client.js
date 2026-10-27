@@ -38,11 +38,14 @@ window.__ModuleLoader__.load({
     const DEFAULTS = Object.freeze({
       enabled: true,
       palette: 'warm',
-      radius: 'standard',
+      radiusScale: 50,
       textFont: '',
       codeFont: '',
       strongWeight: 500,
     })
+
+    /** Corner presets from before the slider, read only when no position was stored. */
+    const LEGACY_RADIUS_SCALE = { product: 0, standard: 40, large: 100 }
 
     /** Repeat one value for both palettes; only scheme-independent tokens use it. */
     const same = (value) => ({ light: value, dark: value })
@@ -123,11 +126,14 @@ window.__ModuleLoader__.load({
     }
 
     /** Corner scales by preset; circles, capsules, and sub-4px details keep their own values. */
-    const RADIUS_SCALES = {
-      product: { xs: '4px', sm: '8px', md: '12px', lg: '16px', xl: '20px', panel: '28px' },
-      standard: { xs: '6px', sm: '10px', md: '14px', lg: '18px', xl: '22px', panel: '32px' },
-      large: { xs: '8px', sm: '14px', md: '18px', lg: '24px', xl: '28px', panel: '36px' },
-    }
+    /**
+     * Corner-radius anchors in px. The slider interpolates between them per
+     * tier, so every tier keeps its own proportion instead of all of them
+     * moving by one offset. The round anchor reproduces the old `large` preset,
+     * which is what a document written before the slider renders as.
+     */
+    const RADIUS_PRODUCT = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, panel: 28 }
+    const RADIUS_ROUND = { xs: 8, sm: 14, md: 18, lg: 24, xl: 28, panel: 36 }
 
     const TEXT_FONT_DEFAULT = "system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', "
       + "'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif"
@@ -135,18 +141,65 @@ window.__ModuleLoader__.load({
       + "'Liberation Mono', Menlo, 'PingFang SC', 'Microsoft YaHei'"
 
     /**
+     * Resolve the stored weight to one the font stack can render.
+     * @param value - stored weight.
+     * @returns 300 through 700 in hundreds, defaulting to 500.
+     */
+    function weightOf(value) {
+      const weight = Number(value)
+      if (!Number.isFinite(weight)) return 500
+      return Math.min(700, Math.max(300, Math.round(weight / 100) * 100))
+    }
+
+    /**
+     * Fill in anything a stored section predates, so a document written before
+     * the sliders existed keeps rendering exactly as it did. The legacy preset
+     * is consulted only when the stored section has no slider position, which
+     * is why this takes the raw section rather than one already merged with
+     * {@link DEFAULTS}.
+     * @param config - stored section, or the optimistic overlay on top of it.
+     * @returns the section with every field resolved.
+     */
+    function prepare(config) {
+      const stored = config ?? {}
+      const radiusScale = typeof stored.radiusScale === 'number'
+        ? stored.radiusScale
+        : (LEGACY_RADIUS_SCALE[stored.radius] ?? DEFAULTS.radiusScale)
+      return {
+        ...DEFAULTS,
+        ...stored,
+        radiusScale,
+        strongWeight: weightOf(stored.strongWeight ?? DEFAULTS.strongWeight),
+      }
+    }
+
+    /**
+     * Corner radius in px for one tier at the current slider position.
+     * @param tier - radius scale step.
+     * @param position - 0 keeps the product scale, 100 is fully rounded.
+     * @returns the rounded px value.
+     */
+    function radiusAt(tier, position) {
+      const base = RADIUS_PRODUCT[tier]
+      const round = RADIUS_ROUND[tier]
+      return Math.round(base + (round - base) * (position / 100))
+    }
+
+    /**
      * Derive the override layer from one configuration value.
      * @param config - resolved settings section.
      * @returns token name to `{ light, dark }`, empty when the theme is disabled.
      */
-    function tokensFor(config) {
+    function tokensFor(rawConfig) {
+      const config = prepare(rawConfig)
       const tokens = {}
       if (config.enabled === false) return tokens
 
       if (config.palette !== 'product') Object.assign(tokens, WARM_COLORS)
 
-      const scale = RADIUS_SCALES[config.radius] ?? RADIUS_SCALES.standard
-      for (const [step, value] of Object.entries(scale)) tokens[`--dsw-radius-${step}`] = same(value)
+      for (const tier of Object.keys(RADIUS_PRODUCT)) {
+        tokens[`--dsw-radius-${tier}`] = same(`${radiusAt(tier, config.radiusScale)}px`)
+      }
 
       // Default stacks, not the composite variables the presenter writes: a
       // font chosen in Settings still wins, and an empty field lands here.
@@ -156,7 +209,7 @@ window.__ModuleLoader__.load({
       // The composite shorthand embeds size and line-height, so it repeats the
       // product expression verbatim instead of pinning pixels: the type ladder
       // still follows the Settings font size.
-      const weight = String(config.strongWeight === 600 ? 600 : 500)
+      const weight = String(config.strongWeight)
       tokens['--dsw-font-markdown-base-strong'] = same(
         `${weight} var(--dsh-content-font-size, 14px) / calc(24px + var(--dsh-content-font-delta)) var(--dsw-font-family)`,
       )
@@ -178,12 +231,9 @@ window.__ModuleLoader__.load({
       'palette.warm': 'Warm',
       'palette.product': 'Product',
       'radius.title': 'Corner radius',
-      'radius.hint': 'Circles, capsules, and hairline details keep their own geometry',
-      'radius.product': 'Product',
-      'radius.standard': 'Soft',
-      'radius.large': 'Round',
+      'radius.hint': 'Drag to soften every corner at once; circles, capsules, and hairline details keep their own geometry',
       'weight.title': 'Emphasis weight',
-      'weight.hint': 'Weight of emphasized body text; the product default is 600',
+      'weight.hint': 'Drag to set how heavy emphasized body text is; the product default is 600',
       'textFont.title': 'Body font',
       'textFont.hint': 'Leave empty for the theme stack; a font chosen in Appearance still wins',
       'codeFont.title': 'Code font',
@@ -212,12 +262,9 @@ window.__ModuleLoader__.load({
       'palette.warm': '暖中性',
       'palette.product': '产品原色',
       'radius.title': '圆角',
-      'radius.hint': '圆圈、胶囊和发丝级细节保持自身几何',
-      'radius.product': '产品默认',
-      'radius.standard': '柔和',
-      'radius.large': '圆润',
+      'radius.hint': '拖动整体调整圆角；圆圈、胶囊和发丝级细节保持自身几何',
       'weight.title': '强调文字字重',
-      'weight.hint': '加粗正文的重量，产品默认 600',
+      'weight.hint': '拖动调整加粗正文的重量，产品默认 600',
       'textFont.title': '正文字体',
       'textFont.hint': '留空使用主题字体栈；在“外观”里手选的字体仍然优先',
       'codeFont.title': '代码字体',
@@ -246,12 +293,9 @@ window.__ModuleLoader__.load({
       'palette.warm': '暖色',
       'palette.product': '製品の色',
       'radius.title': '角丸',
-      'radius.hint': '円・カプセル・ヘアラインの細部は独自の形状を保ちます',
-      'radius.product': '製品の既定',
-      'radius.standard': 'やわらか',
-      'radius.large': '丸め',
+      'radius.hint': 'ドラッグして全体の角丸を調整します。円・カプセル・ヘアラインの細部は独自の形状を保ちます',
       'weight.title': '強調テキストの太さ',
-      'weight.hint': '強調する本文の太さ。製品の既定は 600 です',
+      'weight.hint': 'ドラッグして強調する本文の太さを調整します。製品の既定は 600 です',
       'textFont.title': '本文フォント',
       'textFont.hint': '空欄ならテーマのフォント。外観で選んだフォントが優先されます',
       'codeFont.title': 'コードフォント',
@@ -280,12 +324,9 @@ window.__ModuleLoader__.load({
       'palette.warm': 'Cálido',
       'palette.product': 'Producto',
       'radius.title': 'Radio de esquina',
-      'radius.hint': 'Los círculos, las cápsulas y los detalles finos conservan su geometría',
-      'radius.product': 'Producto',
-      'radius.standard': 'Suave',
-      'radius.large': 'Redondeado',
+      'radius.hint': 'Arrastra para suavizar todos los ángulos a la vez; los círculos, las cápsulas y los detalles finos conservan su geometría',
       'weight.title': 'Grosor del énfasis',
-      'weight.hint': 'Grosor del texto enfatizado; el valor del producto es 600',
+      'weight.hint': 'Arrastra para ajustar el grosor del texto enfatizado; el valor del producto es 600',
       'textFont.title': 'Fuente del cuerpo',
       'textFont.hint': 'Déjalo vacío para usar la del tema; una fuente elegida en Apariencia sigue teniendo prioridad',
       'codeFont.title': 'Fuente del código',
@@ -314,12 +355,9 @@ window.__ModuleLoader__.load({
       'palette.warm': 'Chaud',
       'palette.product': 'Produit',
       'radius.title': 'Rayon des angles',
-      'radius.hint': 'Les cercles, les capsules et les détails fins gardent leur propre géométrie',
-      'radius.product': 'Produit',
-      'radius.standard': 'Doux',
-      'radius.large': 'Arrondi',
+      'radius.hint': 'Faites glisser pour adoucir tous les angles à la fois ; les cercles, les capsules et les détails fins gardent leur propre géométrie',
       'weight.title': 'Graisse de l’accentuation',
-      'weight.hint': 'Graisse du texte mis en valeur ; la valeur du produit est 600',
+      'weight.hint': 'Faites glisser pour régler la graisse du texte mis en valeur ; la valeur du produit est 600',
       'textFont.title': 'Police du corps',
       'textFont.hint': 'Laissez vide pour la police du thème ; une police choisie dans Apparence reste prioritaire',
       'codeFont.title': 'Police du code',
@@ -348,12 +386,9 @@ window.__ModuleLoader__.load({
       'palette.warm': 'Warm',
       'palette.product': 'Produkt',
       'radius.title': 'Eckenradius',
-      'radius.hint': 'Kreise, Kapseln und Haarlinien-Details behalten ihre eigene Geometrie',
-      'radius.product': 'Produkt',
-      'radius.standard': 'Sanft',
-      'radius.large': 'Rund',
+      'radius.hint': 'Ziehen, um alle Ecken gemeinsam abzurunden; Kreise, Kapseln und Haarlinien-Details behalten ihre eigene Geometrie',
       'weight.title': 'Stärke der Hervorhebung',
-      'weight.hint': 'Stärke hervorgehobenen Fließtexts; Produktvorgabe ist 600',
+      'weight.hint': 'Ziehen, um die Stärke hervorgehobenen Fließtexts zu setzen; Produktvorgabe ist 600',
       'textFont.title': 'Textschrift',
       'textFont.hint': 'Leer lassen für die Schrift des Designs; eine in „Darstellung“ gewählte Schrift hat weiterhin Vorrang',
       'codeFont.title': 'Codeschrift',
@@ -382,12 +417,9 @@ window.__ModuleLoader__.load({
       'palette.warm': 'Quente',
       'palette.product': 'Produto',
       'radius.title': 'Raio dos cantos',
-      'radius.hint': 'Círculos, cápsulas e detalhes finos mantêm a sua própria geometria',
-      'radius.product': 'Produto',
-      'radius.standard': 'Suave',
-      'radius.large': 'Arredondado',
+      'radius.hint': 'Перетащите, чтобы разом скруглить все углы; круги, капсулы и тонкие детали сохраняют собственную геометрию',
       'weight.title': 'Peso do destaque',
-      'weight.hint': 'Peso do texto destacado; o valor do produto é 600',
+      'weight.hint': 'Перетащите, чтобы задать насыщенность выделенного текста; значение продукта — 600',
       'textFont.title': 'Tipo de letra do corpo',
       'textFont.hint': 'Deixe vazio para usar o do tema; um tipo escolhido em Aparência continua a ter prioridade',
       'codeFont.title': 'Tipo de letra do código',
@@ -416,12 +448,9 @@ window.__ModuleLoader__.load({
       'palette.warm': 'Тёплая',
       'palette.product': 'Продукт',
       'radius.title': 'Радиус скругления',
-      'radius.hint': 'Круги, капсулы и тонкие детали сохраняют собственную геометрию',
-      'radius.product': 'Продукт',
-      'radius.standard': 'Мягкий',
-      'radius.large': 'Округлый',
+      'radius.hint': 'Arraste para suavizar todos os cantos de uma vez; círculos, cápsulas e detalhes finos mantêm a sua própria geometria',
       'weight.title': 'Насыщенность выделения',
-      'weight.hint': 'Насыщенность выделенного текста; значение продукта — 600',
+      'weight.hint': 'Arraste para definir o peso do texto destacado; o valor do produto é 600',
       'textFont.title': 'Шрифт текста',
       'textFont.hint': 'Оставьте пустым для шрифта темы; шрифт, выбранный в «Оформлении», по-прежнему важнее',
       'codeFont.title': 'Шрифт кода',
@@ -475,6 +504,22 @@ window.__ModuleLoader__.load({
         border: '0.5px solid var(--dsw-alias-border-l1)',
         borderRadius: 'var(--dsw-radius-md)',
       },
+      sliderRow: { display: 'flex', flexDirection: 'column', gap: '2px', padding: '14px 0' },
+      sliderHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' },
+      sliderValue: {
+        flex: 'none',
+        fontFamily: 'var(--ds-font-family-code)',
+        fontSize: '13px',
+        lineHeight: '20px',
+        color: 'var(--dsw-alias-label-secondary)',
+        fontVariantNumeric: 'tabular-nums',
+      },
+      slider: {
+        width: '100%',
+        margin: '6px 0 0',
+        cursor: 'pointer',
+        accentColor: 'var(--dsw-alias-state-business-primary)',
+      },
     }
 
     /** One token-styled choice chip; the selected state mirrors the Appearance cubes. */
@@ -527,6 +572,65 @@ window.__ModuleLoader__.load({
           style: choiceStyle(option.value === value),
           onClick: () => { if (option.value !== value) onSelect(option.value) },
         }, option.label)))
+    }
+
+    /**
+     * One draggable setting: title and current value above a native range input.
+     *
+     * Dragging reports through two channels on purpose. `onPreview` fires on
+     * every movement and only repaints the token layer; `onCommit` fires when
+     * the gesture ends and is the one that writes to the Host. Persisting on
+     * every movement would queue a settings write plus a describe re-read per
+     * pixel, which is what makes a naive slider feel worse than the chips.
+     *
+     * The thumb follows a local draft while dragging: previews are coalesced,
+     * so binding the input straight to the published value would snap the thumb
+     * back to the last flushed position between frames.
+     * @param props.divider - whether the row draws the separator above it.
+     * @param props.label - row title, also the slider's accessible name.
+     * @param props.hint - one-line explanation under the slider.
+     * @param props.value - current value.
+     * @param props.min - smallest value.
+     * @param props.max - largest value.
+     * @param props.step - value increment.
+     * @param props.format - renders the value shown at the right.
+     * @param props.onPreview - applied while dragging, without persisting.
+     * @param props.onCommit - persisted when the gesture ends.
+     */
+    function SliderRow({ divider, label, hint, value, min, max, step, format, onPreview, onCommit }) {
+      const [draft, setDraft] = React.useState(null)
+      const clamp = next => Math.min(max, Math.max(min, Number(next)))
+      const shown = draft === null ? value : draft
+      const text = format(shown)
+      const move = (event) => {
+        const next = clamp(event.currentTarget.value)
+        setDraft(next)
+        onPreview(next)
+      }
+      const settle = (event) => {
+        const next = clamp(event.currentTarget.value)
+        setDraft(null)
+        onCommit(next)
+      }
+      return h('div', { style: divider ? { ...S.sliderRow, ...S.divider } : S.sliderRow },
+        h('div', { style: S.sliderHead },
+          h('span', { style: S.label }, label),
+          h('span', { style: S.sliderValue, 'aria-hidden': true }, text)),
+        h('input', {
+          type: 'range',
+          min,
+          max,
+          step,
+          value: shown,
+          'aria-label': label,
+          'aria-valuetext': text,
+          style: S.slider,
+          onChange: move,
+          onPointerUp: settle,
+          onKeyUp: settle,
+          onBlur: settle,
+        }),
+        h('span', { style: S.hint }, hint))
     }
 
     /**
@@ -584,24 +688,30 @@ window.__ModuleLoader__.load({
               ],
               onSelect: next => { save('palette', next) },
             })),
-          h(Row, { divider: true, label: t('radius.title'), hint: t('radius.hint') },
-            h(Choices, {
-              name: t('radius.title'),
-              value: config.radius,
-              options: [
-                { value: 'product', label: t('radius.product') },
-                { value: 'standard', label: t('radius.standard') },
-                { value: 'large', label: t('radius.large') },
-              ],
-              onSelect: next => { save('radius', next) },
-            })),
-          h(Row, { divider: true, label: t('weight.title'), hint: t('weight.hint') },
-            h(Choices, {
-              name: t('weight.title'),
-              value: String(config.strongWeight),
-              options: [{ value: '500', label: '500' }, { value: '600', label: '600' }],
-              onSelect: next => { save('strongWeight', Number(next)) },
-            }))),
+          h(SliderRow, {
+            divider: true,
+            label: t('radius.title'),
+            hint: t('radius.hint'),
+            value: config.radiusScale,
+            min: 0,
+            max: 100,
+            step: 5,
+            format: next => `${radiusAt('md', next)}px`,
+            onPreview: next => { preview('radiusScale', next) },
+            onCommit: next => { save('radiusScale', next) },
+          }),
+          h(SliderRow, {
+            divider: true,
+            label: t('weight.title'),
+            hint: t('weight.hint'),
+            value: config.strongWeight,
+            min: 300,
+            max: 700,
+            step: 100,
+            format: next => String(next),
+            onPreview: next => { preview('strongWeight', next) },
+            onCommit: next => { save('strongWeight', next) },
+          })),
 
         h('div', { style: S.card },
           h(Row, { label: t('textFont.title'), hint: t('textFont.hint') },
@@ -668,7 +778,7 @@ window.__ModuleLoader__.load({
         let optimistic = {}
 
         /** The value every consumer and the token layer should currently use. */
-        const effective = () => ({ ...DEFAULTS, ...(serverValue ?? {}), ...optimistic })
+        const effective = () => prepare({ ...(serverValue ?? {}), ...optimistic })
 
         /** Signature of the token map last handed to the theme service. */
         let lastSignature = null
@@ -682,7 +792,7 @@ window.__ModuleLoader__.load({
         // the `settings/document-updated` describe), which is what makes an
         // unconditional rebuild feel like lag.
         const sync = (value) => {
-          const tokens = tokensFor({ ...DEFAULTS, ...(value ?? {}) })
+          const tokens = tokensFor(value ?? {})
           const signature = JSON.stringify(tokens)
           if (signature === lastSignature) return
           lastSignature = signature
@@ -713,8 +823,55 @@ window.__ModuleLoader__.load({
           return false
         }
 
+        /**
+         * A drag reports far more positions than the screen can show. Applying
+         * each one would rebuild the whole layer and force a document-wide style
+         * recalc per pixel, so previews are coalesced: the first lands
+         * immediately, later ones at most once per interval, and the final
+         * position is written once by {@link write}.
+         */
+        const PREVIEW_INTERVAL_MS = 60
+        let pendingPreview = null
+        let previewTimer = null
+        let previewAt = 0
+
+        const cancelPreview = () => {
+          pendingPreview = null
+          if (previewTimer !== null) {
+            clearTimeout(previewTimer)
+            previewTimer = null
+          }
+        }
+
+        const flushPreview = () => {
+          previewTimer = null
+          if (pendingPreview === null) return
+          const next = pendingPreview
+          pendingPreview = null
+          previewAt = Date.now()
+          optimistic[next.field] = next.value
+          publish({ ...snapshot, value: effective(), error: null })
+          sync(effective())
+        }
+
+        /**
+         * Apply a value while a slider is being dragged, without persisting it.
+         * @param field - settings field being dragged.
+         * @param value - the position under the pointer.
+         */
+        const preview = (field, value) => {
+          pendingPreview = { field, value }
+          const wait = previewAt + PREVIEW_INTERVAL_MS - Date.now()
+          if (wait <= 0) {
+            flushPreview()
+            return
+          }
+          if (previewTimer === null) previewTimer = setTimeout(flushPreview, wait)
+        }
+
         const write = async (field, value) => {
           if (bound === null) return fail(t('notReady'))
+          cancelPreview()
           optimistic[field] = value
           publish({ ...snapshot, value: effective(), error: null })
           sync(effective())
@@ -782,6 +939,7 @@ window.__ModuleLoader__.load({
 
         ctx.effect(() => describe.subscribe(refresh), 'linen: settings directory')
         ctx.effect(() => refresh(), 'linen: initial namespace resolution')
+        ctx.effect(() => cancelPreview, 'linen: preview timer')
         ctx.effect(() => () => {
           if (unbind !== null) unbind()
           unbind = null
@@ -797,6 +955,7 @@ window.__ModuleLoader__.load({
           inject: () => ({
             hooks: { config: source },
             save: write,
+            preview,
           }),
         }, ThemeSection))
       },

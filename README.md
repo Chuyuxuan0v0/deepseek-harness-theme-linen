@@ -24,7 +24,7 @@ The theme's settings page, under **Settings → Linen theme**:
 |---|---|
 | Surfaces | Page, raised layers, overlay, sidebar, code blocks, and scrollbars move to a warm neutral palette |
 | Borders and text | Four border steps and seven text steps retuned to the same warm ramp |
-| Corner radius | One step softer than the product scale: `4/8/12/16/20/28` → `6/10/14/18/22/32` (a third "round" scale is also selectable) |
+| Corner radius | A slider interpolates every tier between the product scale `4/8/12/16/20/28` and the roundest `8/14/18/24/28/36`, defaulting to the middle |
 | Fonts | Default text and code stacks prefer `system-ui` / `Cascadia Code`; emphasis drops from 600 to 500 |
 | Interactive fills | Hover, active, ghost-button, and floating-button fills follow the warm ramp |
 
@@ -71,12 +71,12 @@ Open **Settings → Linen theme**. Changes apply immediately and are stored in t
 |---|---|---|
 | Enable the Linen theme | on / off | Off restores every product default |
 | Palette | Warm / Product | Product keeps the original colors and applies only corners and fonts |
-| Corner radius | Product / Soft / Round | Three radius scales |
-| Emphasis weight | 500 / 600 | Weight of emphasized body text; product default is 600 |
+| Corner radius | slider, 0–100% | Interpolates every radius tier between the product scale and the roundest one; 0% is the product scale |
+| Emphasis weight | slider, 300–700 | Weight of emphasized body text in steps of 100; product default is 600 |
 | Body font | font list | Empty uses the theme stack; a font chosen in Appearance still wins |
 | Code font | font list | Code blocks, inline code, and code text outside the terminal |
 
-Font fields take comma-separated family names and commit on blur or Enter.
+Dragging a slider repaints immediately but writes to the Host only when the gesture ends, so a drag costs one settings write instead of one per pixel. Font fields take comma-separated family names and commit on blur or Enter.
 
 ## Requirements
 
@@ -135,7 +135,7 @@ MIT for this plugin. The vendored `@deepseek-ai/schemastery` and `@deepseek-ai/c
 
 ### 改了什么
 
-页面与浮层底色、四级边框、七级文字色阶、侧栏、代码块与行内代码、滚动条、插画、悬停与激活填充，统一挪到暖中性色阶；圆角比产品尺度再柔一档；正文字体和代码字体优先使用 `system-ui` 与 `Cascadia Code`；加粗正文从 600 降到 500。
+页面与浮层底色、四级边框、七级文字色阶、侧栏、代码块与行内代码、滚动条、插画、悬停与激活填充，统一挪到暖中性色阶；圆角用滑块在「产品尺度 ↔ 最圆」之间连续调整；正文字体和代码字体优先使用 `system-ui` 与 `Cascadia Code`；加粗正文默认 500。
 
 ### 刻意不改什么
 
@@ -176,6 +176,8 @@ npm pack --dry-run --json > /tmp/pack.json && node scripts/verify.mjs /tmp/pack.
 
 ### 配置
 
-打开 **设置 → 亚麻主题**。改动立即生效，保存在宿主设置文档里，重启后仍在，换浏览器也跟随。可调：启用开关、配色（暖中性 / 产品原色）、圆角（产品默认 / 柔和 / 圆润）、强调字重（500 / 600）、正文字体、代码字体。
+打开 **设置 → 亚麻主题**。改动立即生效，保存在宿主设置文档里，重启后仍在，换浏览器也跟随。可调：启用开关、配色（暖中性 / 产品原色）、圆角滑块（0–100%，0% 就是产品尺度）、强调字重滑块（300–700，以 100 为步进）、正文字体、代码字体。
+
+拖动滑块时画面立即跟手，但只在松手时才写入宿主，所以一次拖动只产生一次设置写入，而不是每个像素一次。
 
 字体输入框接受逗号分隔的字体名，失焦或回车提交；留空则使用主题自带的字体栈，而你在「外观」里手选的字体始终优先。

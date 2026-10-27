@@ -1,6 +1,6 @@
 {
   "name": "dsh-theme-linen",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Warm neutral theme for the DeepSeek Harness Web GUI: warmer surfaces, rounder corners, sharper default fonts, configured from a settings page.",
   "type": "module",
   "license": "MIT",
