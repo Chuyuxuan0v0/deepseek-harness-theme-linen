@@ -93,6 +93,7 @@ locale/*.json         Plugin manager title and description (8 languages)
 icon.svg              Plugin artwork
 vendor/               Vendored @deepseek-ai/schemastery and cosmokit builds (MIT)
 scripts/verify.mjs    Package invariant checks, run by CI and locally
+scripts/measure-apply.mjs  Counts the token rebuilds one settings click causes
 assets/               Screenshots used by this README (not packed)
 ```
 

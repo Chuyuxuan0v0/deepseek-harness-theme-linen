@@ -656,14 +656,40 @@ window.__ModuleLoader__.load({
         let layer = null
         let boundNamespace = null
 
+        /** Last accepted value from the Host; the optimistic map sits on top of it. */
+        let serverValue
+
+        /**
+         * Values chosen but not yet confirmed by the Host. Applying them before
+         * the write settles keeps a click responsive: a settings write costs a
+         * Host round trip plus a full describe re-read, which is far too long to
+         * leave the chip looking unpressed.
+         */
+        let optimistic = {}
+
+        /** The value every consumer and the token layer should currently use. */
+        const effective = () => ({ ...DEFAULTS, ...(serverValue ?? {}), ...optimistic })
+
+        /** Signature of the token map last handed to the theme service. */
+        let lastSignature = null
+
         // One live token layer: every accepted value replaces it, and a
-        // disabled theme drops it so the product values return.
+        // disabled theme drops it so the product values return. The theme
+        // service republishes its whole snapshot on every call, and the
+        // presenter then rewrites every token inline on `body` and forces a
+        // style flush — so a rebuild that changes nothing is pure cost. The
+        // Host echoes each write at least twice (the folded write answer and
+        // the `settings/document-updated` describe), which is what makes an
+        // unconditional rebuild feel like lag.
         const sync = (value) => {
+          const tokens = tokensFor({ ...DEFAULTS, ...(value ?? {}) })
+          const signature = JSON.stringify(tokens)
+          if (signature === lastSignature) return
+          lastSignature = signature
           if (layer !== null) {
             layer()
             layer = null
           }
-          const tokens = tokensFor({ ...DEFAULTS, ...(value ?? {}) })
           if (Object.keys(tokens).length > 0) layer = ctx.theme.overrideTokens('linen', tokens)
         }
 
@@ -673,8 +699,13 @@ window.__ModuleLoader__.load({
 
         const adopt = () => {
           const current = bound.getSnapshot()
-          publish({ ...current, error: null, namespace: boundNamespace })
-          sync(current.value)
+          serverValue = current.value
+          // Drop optimistic entries the Host has now confirmed.
+          for (const [field, chosen] of Object.entries(optimistic)) {
+            if ((serverValue ?? {})[field] === chosen) delete optimistic[field]
+          }
+          publish({ ...current, value: effective(), error: null, namespace: boundNamespace })
+          sync(effective())
         }
 
         const fail = (message) => {
@@ -684,12 +715,26 @@ window.__ModuleLoader__.load({
 
         const write = async (field, value) => {
           if (bound === null) return fail(t('notReady'))
+          optimistic[field] = value
+          publish({ ...snapshot, value: effective(), error: null })
+          sync(effective())
           try {
             const accepted = await bound.set(field, value)
-            return accepted ? true : fail(t('rejected'))
+            // The form folds the write answer before `set` resolves, so the
+            // Host's own value has already been adopted by now.
+            delete optimistic[field]
+            if (!accepted) {
+              publish({ ...snapshot, value: effective(), error: t('rejected') })
+              sync(effective())
+              return false
+            }
+            return true
           } catch (error) {
+            delete optimistic[field]
             const detail = error instanceof Error ? error.message : t('unknownError')
-            return fail(`${t('failed')} ${detail}`)
+            publish({ ...snapshot, value: effective(), error: `${t('failed')} ${detail}` })
+            sync(effective())
+            return false
           }
         }
 
