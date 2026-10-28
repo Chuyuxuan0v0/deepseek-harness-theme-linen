@@ -127,13 +127,18 @@ window.__ModuleLoader__.load({
 
     /** Corner scales by preset; circles, capsules, and sub-4px details keep their own values. */
     /**
-     * Corner-radius anchors in px. The slider interpolates between them per
-     * tier, so every tier keeps its own proportion instead of all of them
-     * moving by one offset. The round anchor reproduces the old `large` preset,
-     * which is what a document written before the slider renders as.
+     * Corner-radius anchors in px, interpolated per tier so every tier keeps its
+     * own proportion instead of all of them moving by one offset.
+     *
+     * - 0 is the product scale.
+     * - 100 is the roundest scale earlier releases shipped, so a document that
+     *   stores the old `large` preset keeps rendering exactly as before.
+     * - 200 is deliberately past that, because a slider whose maximum equals the
+     *   previous maximum gives the user nothing left to drag towards.
      */
     const RADIUS_PRODUCT = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, panel: 28 }
     const RADIUS_ROUND = { xs: 8, sm: 14, md: 18, lg: 24, xl: 28, panel: 36 }
+    const RADIUS_MAX = { xs: 12, sm: 20, md: 26, lg: 34, xl: 40, panel: 52 }
 
     const TEXT_FONT_DEFAULT = "system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', "
       + "'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif"
@@ -176,13 +181,18 @@ window.__ModuleLoader__.load({
     /**
      * Corner radius in px for one tier at the current slider position.
      * @param tier - radius scale step.
-     * @param position - 0 keeps the product scale, 100 is fully rounded.
+     * @param position - 0 is the product scale, 100 the previous roundest scale,
+     * 200 the roundest this theme offers.
      * @returns the rounded px value.
      */
     function radiusAt(tier, position) {
-      const base = RADIUS_PRODUCT[tier]
+      const at = Math.max(0, Math.min(200, Number(position) || 0))
+      if (at <= 100) {
+        const base = RADIUS_PRODUCT[tier]
+        return Math.round(base + (RADIUS_ROUND[tier] - base) * (at / 100))
+      }
       const round = RADIUS_ROUND[tier]
-      return Math.round(base + (round - base) * (position / 100))
+      return Math.round(round + (RADIUS_MAX[tier] - round) * ((at - 100) / 100))
     }
 
     /**
@@ -648,6 +658,10 @@ window.__ModuleLoader__.load({
       const snapshot = props.useConfig(value => value)
       const config = { ...DEFAULTS, ...(snapshot?.value ?? {}) }
       const save = typeof props.save === 'function' ? props.save : () => Promise.resolve(false)
+      // Slider previews arrive through the inject face; a missing face must not
+      // throw inside the drag handler, where the error would vanish and the
+      // thumb would move while the page stayed still.
+      const preview = typeof props.preview === 'function' ? props.preview : () => {}
 
       if (snapshot.status === 'unavailable') {
         const served = Array.isArray(snapshot.served) ? snapshot.served : []
@@ -694,7 +708,7 @@ window.__ModuleLoader__.load({
             hint: t('radius.hint'),
             value: config.radiusScale,
             min: 0,
-            max: 100,
+            max: 200,
             step: 5,
             format: next => `${radiusAt('md', next)}px`,
             onPreview: next => { preview('radiusScale', next) },

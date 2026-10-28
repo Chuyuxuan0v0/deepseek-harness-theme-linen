@@ -24,7 +24,7 @@ The theme's settings page, under **Settings → Linen theme**:
 |---|---|
 | Surfaces | Page, raised layers, overlay, sidebar, code blocks, and scrollbars move to a warm neutral palette |
 | Borders and text | Four border steps and seven text steps retuned to the same warm ramp |
-| Corner radius | A slider interpolates every tier between the product scale `4/8/12/16/20/28` and the roundest `8/14/18/24/28/36`, defaulting to the middle |
+| Corner radius | A slider interpolates every tier between the product scale `4/8/12/16/20/28` and the roundest `12/20/26/34/40/52`; 100 on the slider equals the rounded scale earlier releases shipped |
 | Fonts | Default text and code stacks prefer `system-ui` / `Cascadia Code`; emphasis drops from 600 to 500 |
 | Interactive fills | Hover, active, ghost-button, and floating-button fills follow the warm ramp |
 
@@ -71,7 +71,7 @@ Open **Settings → Linen theme**. Changes apply immediately and are stored in t
 |---|---|---|
 | Enable the Linen theme | on / off | Off restores every product default |
 | Palette | Warm / Product | Product keeps the original colors and applies only corners and fonts |
-| Corner radius | slider, 0–100% | Interpolates every radius tier between the product scale and the roundest one; 0% is the product scale |
+| Corner radius | slider, 0–200 | Interpolates every radius tier: 0 is the product scale, 100 is the roundest scale earlier releases shipped, 200 is rounder still |
 | Emphasis weight | slider, 300–700 | Weight of emphasized body text in steps of 100; product default is 600 |
 | Body font | font list | Empty uses the theme stack; a font chosen in Appearance still wins |
 | Code font | font list | Code blocks, inline code, and code text outside the terminal |
@@ -176,7 +176,7 @@ npm pack --dry-run --json > /tmp/pack.json && node scripts/verify.mjs /tmp/pack.
 
 ### 配置
 
-打开 **设置 → 亚麻主题**。改动立即生效，保存在宿主设置文档里，重启后仍在，换浏览器也跟随。可调：启用开关、配色（暖中性 / 产品原色）、圆角滑块（0–100%，0% 就是产品尺度）、强调字重滑块（300–700，以 100 为步进）、正文字体、代码字体。
+打开 **设置 → 亚麻主题**。改动立即生效，保存在宿主设置文档里，重启后仍在，换浏览器也跟随。可调：启用开关、配色（暖中性 / 产品原色）、圆角滑块（0–200，0 是产品尺度，100 等于旧版的「圆润」，200 更圆）、强调字重滑块（300–700，以 100 为步进）、正文字体、代码字体。
 
 拖动滑块时画面立即跟手，但只在松手时才写入宿主，所以一次拖动只产生一次设置写入，而不是每个像素一次。
 

@@ -21,11 +21,11 @@ export const Config = z.object({
   /** `warm` retunes surfaces; `product` keeps the shipped palette. */
   palette: z.union(['warm', 'product']).default('warm').volatile(),
   /**
-   * Corner-radius position in percent: 0 keeps the product scale, 100 is the
-   * roundest scale. Integer percent rather than a multiplier so the stored
-   * value needs no floating-point tolerance.
+   * Corner-radius position: 0 keeps the product scale, 100 is the roundest
+   * scale of earlier releases, 200 is rounder still. Integer steps rather than
+   * a multiplier so the stored value needs no floating-point tolerance.
    */
-  radiusScale: z.number().step(5).min(0).max(100).default(50).volatile(),
+  radiusScale: z.number().step(5).min(0).max(200).default(50).volatile(),
   /**
    * Legacy corner preset, read only when {@link radiusScale} was never stored.
    * Kept in the schema so a document written before the slider existed still
