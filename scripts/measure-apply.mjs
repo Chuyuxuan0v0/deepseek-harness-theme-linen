@@ -215,6 +215,36 @@ if (radiusSlider === undefined) {
   }
 }
 
+// The weight slider must move the markdown ladder, not one rule. The composites
+// are `font:` shorthands, so a weight that landed only on the split
+// `-font-weight` parts would change nothing that renders.
+const weightSlider = sliders.find(node => node.props.max === 700)
+if (weightSlider === undefined) {
+  failures.push('the weight slider does not span 300..700')
+} else {
+  try {
+    weightSlider.props.onChange({ currentTarget: { value: '700' } })
+    // Previews are coalesced behind a timer; wait for the flush before reading.
+    await new Promise(resolve => setTimeout(resolve, 200))
+  } catch (error) {
+    failures.push(`dragging the weight slider threw: ${error.message}`)
+  }
+  const last = calls[calls.length - 1]
+  const leading = name => String(last.tokens[`--dsw-font-markdown-${name}`]?.light ?? '').split(' ')[0]
+  const measured = {
+    strong: leading('base-strong'),
+    h4: leading('h4'),
+    h3: leading('h3'),
+    h1: leading('h1'),
+    tableHead: leading('table-head'),
+  }
+  const expected = { strong: '700', h4: '700', h3: '800', h1: '800', tableHead: '600' }
+  for (const [role, want] of Object.entries(expected)) {
+    if (measured[role] !== want) failures.push(`weight ${role} is ${measured[role]}, expected ${want}`)
+  }
+  console.log('weight slider at 700 ->', JSON.stringify(measured))
+}
+
 // ------------------------------------------------------------------ report
 const perRebuild = Object.keys(calls[calls.length - 1]?.tokens ?? {}).length
 console.log('tokens per full rebuild:', perRebuild)

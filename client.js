@@ -216,14 +216,46 @@ window.__ModuleLoader__.load({
       tokens['--dsh-font-family-text-default'] = same(config.textFont || TEXT_FONT_DEFAULT)
       tokens['--dsh-font-family-code-default'] = same(config.codeFont || CODE_FONT_DEFAULT)
 
-      // The composite shorthand embeds size and line-height, so it repeats the
-      // product expression verbatim instead of pinning pixels: the type ladder
-      // still follows the Settings font size.
-      const weight = String(config.strongWeight)
-      tokens['--dsw-font-markdown-base-strong'] = same(
-        `${weight} var(--dsh-content-font-size, 14px) / calc(24px + var(--dsh-content-font-delta)) var(--dsw-font-family)`,
-      )
-      tokens['--dsw-font-markdown-base-strong-font-weight'] = same(weight)
+      // Reading weight for rendered markdown.
+      //
+      // These are `font:` shorthands, and a shorthand cannot be adjusted in
+      // place, so each one is re-declared with only its weight number changed.
+      // The size and line-height expressions are copied verbatim from the
+      // product sheet and still reference the live font-size variables, so the
+      // ladder keeps following the Settings font size.
+      //
+      // Scope matters: the product bakes the weight of ordinary interface text
+      // into fixed shorthands such as `--dsw-font-xs-13`, so this covers the
+      // text people read (headings, bold, table headers), not buttons and
+      // labels.
+      const strong = config.strongWeight
+      const heading = Math.min(900, strong + 100)
+      const de = 'var(--dsh-content-font-delta)'
+      const body = (weight, size, lineHeight) =>
+        `${weight} ${size} / ${lineHeight} var(--dsw-font-family)`
+
+      const weighted = {
+        '--dsw-font-markdown-base-strong': body(strong, 'var(--dsh-content-font-size, 14px)', `calc(24px + ${de})`),
+        '--dsw-font-markdown-h4': body(strong, 'var(--dsh-content-font-size, 14px)', `calc(24px + ${de})`),
+        '--dsw-font-markdown-h3': body(heading, `calc(18px + ${de})`, `calc(26px + ${de})`),
+        '--dsw-font-markdown-h2': body(heading, `calc(19px + ${de})`, `calc(28px + ${de})`),
+        '--dsw-font-markdown-h1': body(heading, `calc(21px + ${de})`, `calc(30px + ${de})`),
+        '--dsw-font-markdown-table-head': body(
+          Math.max(100, strong - 100),
+          'var(--dsh-content-font-size-secondary, 13px)',
+          'calc(22px + var(--dsh-content-font-delta-secondary, 0px))',
+        ),
+      }
+      for (const [name, value] of Object.entries(weighted)) tokens[name] = same(value)
+
+      // The split parts exist for the same roles; keep them agreeing with the
+      // shorthands so a component that reads a part sees the same weight.
+      tokens['--dsw-font-markdown-base-strong-font-weight'] = same(String(strong))
+      tokens['--dsw-font-markdown-h4-font-weight'] = same(String(strong))
+      tokens['--dsw-font-markdown-h3-font-weight'] = same(String(heading))
+      tokens['--dsw-font-markdown-h2-font-weight'] = same(String(heading))
+      tokens['--dsw-font-markdown-h1-font-weight'] = same(String(heading))
+      tokens['--dsw-font-markdown-table-head-font-weight'] = same(String(Math.max(100, strong - 100)))
       return tokens
     }
 
@@ -243,7 +275,7 @@ window.__ModuleLoader__.load({
       'radius.title': 'Corner radius',
       'radius.hint': 'Drag to soften every corner at once; circles, capsules, and hairline details keep their own geometry',
       'weight.title': 'Emphasis weight',
-      'weight.hint': 'Drag to set how heavy emphasized body text is; the product default is 600',
+      'weight.hint': 'Drag to set how heavy rendered headings and bold text are; interface labels keep their own weight',
       'textFont.title': 'Body font',
       'textFont.hint': 'Leave empty for the theme stack; a font chosen in Appearance still wins',
       'codeFont.title': 'Code font',
@@ -274,7 +306,7 @@ window.__ModuleLoader__.load({
       'radius.title': '圆角',
       'radius.hint': '拖动整体调整圆角；圆圈、胶囊和发丝级细节保持自身几何',
       'weight.title': '强调文字字重',
-      'weight.hint': '拖动调整加粗正文的重量，产品默认 600',
+      'weight.hint': '拖动调整正文标题与加粗文字的字重；界面标签保持自身字重',
       'textFont.title': '正文字体',
       'textFont.hint': '留空使用主题字体栈；在“外观”里手选的字体仍然优先',
       'codeFont.title': '代码字体',
@@ -305,7 +337,7 @@ window.__ModuleLoader__.load({
       'radius.title': '角丸',
       'radius.hint': 'ドラッグして全体の角丸を調整します。円・カプセル・ヘアラインの細部は独自の形状を保ちます',
       'weight.title': '強調テキストの太さ',
-      'weight.hint': 'ドラッグして強調する本文の太さを調整します。製品の既定は 600 です',
+      'weight.hint': 'ドラッグして本文の見出しと太字の太さを調整します。UI のラベルは独自の太さを保ちます',
       'textFont.title': '本文フォント',
       'textFont.hint': '空欄ならテーマのフォント。外観で選んだフォントが優先されます',
       'codeFont.title': 'コードフォント',
@@ -336,7 +368,7 @@ window.__ModuleLoader__.load({
       'radius.title': 'Radio de esquina',
       'radius.hint': 'Arrastra para suavizar todos los ángulos a la vez; los círculos, las cápsulas y los detalles finos conservan su geometría',
       'weight.title': 'Grosor del énfasis',
-      'weight.hint': 'Arrastra para ajustar el grosor del texto enfatizado; el valor del producto es 600',
+      'weight.hint': 'Arrastra para ajustar el grosor de los títulos y el texto en negrita; las etiquetas de la interfaz conservan el suyo',
       'textFont.title': 'Fuente del cuerpo',
       'textFont.hint': 'Déjalo vacío para usar la del tema; una fuente elegida en Apariencia sigue teniendo prioridad',
       'codeFont.title': 'Fuente del código',
@@ -367,7 +399,7 @@ window.__ModuleLoader__.load({
       'radius.title': 'Rayon des angles',
       'radius.hint': 'Faites glisser pour adoucir tous les angles à la fois ; les cercles, les capsules et les détails fins gardent leur propre géométrie',
       'weight.title': 'Graisse de l’accentuation',
-      'weight.hint': 'Faites glisser pour régler la graisse du texte mis en valeur ; la valeur du produit est 600',
+      'weight.hint': 'Faites glisser pour régler la graisse des titres et du texte en gras ; les libellés de l’interface gardent la leur',
       'textFont.title': 'Police du corps',
       'textFont.hint': 'Laissez vide pour la police du thème ; une police choisie dans Apparence reste prioritaire',
       'codeFont.title': 'Police du code',
@@ -398,7 +430,7 @@ window.__ModuleLoader__.load({
       'radius.title': 'Eckenradius',
       'radius.hint': 'Ziehen, um alle Ecken gemeinsam abzurunden; Kreise, Kapseln und Haarlinien-Details behalten ihre eigene Geometrie',
       'weight.title': 'Stärke der Hervorhebung',
-      'weight.hint': 'Ziehen, um die Stärke hervorgehobenen Fließtexts zu setzen; Produktvorgabe ist 600',
+      'weight.hint': 'Ziehen, um die Stärke von Überschriften und fettem Text zu setzen; Oberflächenbeschriftungen behalten ihre eigene',
       'textFont.title': 'Textschrift',
       'textFont.hint': 'Leer lassen für die Schrift des Designs; eine in „Darstellung“ gewählte Schrift hat weiterhin Vorrang',
       'codeFont.title': 'Codeschrift',
@@ -429,7 +461,7 @@ window.__ModuleLoader__.load({
       'radius.title': 'Raio dos cantos',
       'radius.hint': 'Перетащите, чтобы разом скруглить все углы; круги, капсулы и тонкие детали сохраняют собственную геометрию',
       'weight.title': 'Peso do destaque',
-      'weight.hint': 'Перетащите, чтобы задать насыщенность выделенного текста; значение продукта — 600',
+      'weight.hint': 'Перетащите, чтобы задать насыщенность заголовков и жирного текста; подписи интерфейса сохраняют свою',
       'textFont.title': 'Tipo de letra do corpo',
       'textFont.hint': 'Deixe vazio para usar o do tema; um tipo escolhido em Aparência continua a ter prioridade',
       'codeFont.title': 'Tipo de letra do código',
@@ -460,7 +492,7 @@ window.__ModuleLoader__.load({
       'radius.title': 'Радиус скругления',
       'radius.hint': 'Arraste para suavizar todos os cantos de uma vez; círculos, cápsulas e detalhes finos mantêm a sua própria geometria',
       'weight.title': 'Насыщенность выделения',
-      'weight.hint': 'Arraste para definir o peso do texto destacado; o valor do produto é 600',
+      'weight.hint': 'Arraste para definir o peso dos títulos e do texto a negrito; as etiquetas da interface mantêm o seu',
       'textFont.title': 'Шрифт текста',
       'textFont.hint': 'Оставьте пустым для шрифта темы; шрифт, выбранный в «Оформлении», по-прежнему важнее',
       'codeFont.title': 'Шрифт кода',
